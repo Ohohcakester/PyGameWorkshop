@@ -1,10 +1,12 @@
 import sys, pygame
+import random
 
 pygame.init()
 width = 480
 height = 360
 screen = pygame.display.set_mode((width, height))
 
+frame = 0
 
 class KeyController(object):
     def __init__(self):
@@ -71,6 +73,58 @@ class Bullet(object):
         pygame.draw.circle(screen, self.color, (self.x, self.y), self.radius)
 
 
+class Enemy(object):
+    def __init__(self, y):
+        global width
+        self.x = width
+        self.y = y
+        self.vx = -2
+        self.vy = 0
+        self.active = True
+        self.color = (0,255,255)
+        self.radius = 25
+        self.hp = 10
+
+    def update(self):
+        if not self.active: return
+
+        global width, height
+        self.x += self.vx
+        self.y += self.vy
+
+        if self.x < 0:
+            self.remove()
+
+        self.checkCollision()
+
+    def checkCollision(self):
+        global bullets
+        for bullet in bullets:
+            if bullet.active and self.collideWith(bullet):
+                bullet.remove()
+                self.takeDamage(2)
+
+    def takeDamage(self, amount):
+        self.hp -= amount
+        if self.hp <= 0:
+            self.remove()
+
+    def collideWith(self, bullet):
+        dx = self.x - bullet.x
+        dy = self.y - bullet.y
+        dist = self.radius + bullet.radius
+        return dx*dx + dy*dy <= dist*dist
+
+    def remove(self):
+        self.active = False
+
+    def draw(self):
+        if not self.active: return
+        pygame.draw.rect(screen, self.color,
+                            (self.x-self.radius, self.y-self.radius,
+                            2*self.radius, 2*self.radius))
+
+
 class Player(object):
     def __init__(self):
         self.x = 50
@@ -124,6 +178,7 @@ class Player(object):
 player = Player()
 keyController = KeyController()
 bullets = []
+enemies = []
 
 # spawns a new bullet at the specified location with a specified velocity
 def spawnBullet(x, y, vx, vy):
@@ -131,11 +186,19 @@ def spawnBullet(x, y, vx, vy):
     bullet = Bullet(x, y, vx, vy)
     bullets.append(bullet)
 
+# spawns a new enemey at the specified location.
+def spawnEnemy(y):
+    global enemies
+    enemy = Enemy(y)
+    enemies.append(enemy)
+
 # Remove all inactive items from the array periodically.
-def maybeCleanUpArray():
-    global bullets
+def maybeCleanUpArrays():
+    global bullets, enemies
     if len(bullets) > 30:
-        bullets = list(filter(lambda bullet : bullet.active, bullets))
+        bullets = list(filter(lambda obj : obj.active, bullets))
+    if len(enemies) > 30:
+        enemies = list(filter(lambda obj : obj.active, enemies))
 
 
 """ START REGION - CORE FUNCTIONS """
@@ -143,13 +206,19 @@ def maybeCleanUpArray():
 # Update function
 # ALL game logic should go here.
 def update():
-    global player, bullets, keyController
+    global player, bullets, keyController, frame, height
     player.update()
     for bullet in bullets:
         bullet.update()
+    for enemy in enemies:
+        enemy.update()
 
-    maybeCleanUpArray()
+    if frame % 50 == 0:
+        spawnEnemy(random.randrange(0,height))
+
+    maybeCleanUpArrays()
     keyController.update()
+    frame += 1
 
 # Event read function
 # Keyboard / Mouse input is read here.
@@ -176,6 +245,8 @@ def draw():
     player.draw()
     for bullet in bullets:
         bullet.draw()
+    for enemy in enemies:
+        enemy.draw()
     
     pygame.display.flip()
 
